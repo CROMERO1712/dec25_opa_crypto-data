@@ -160,7 +160,7 @@ python sourcing/script3_historique_market_cap.py
 |---------|-------------|--------|
 | `main` | — | Version stable OPA |
 | `develop` | — | Branche de travail |
-| `feature/sourcing` | Carlos | ✅ Scripts 1, 2, 3 terminés |
+| `feature/sourcing` | --- | ✅ Scripts 1, 2, 3 terminés |
 | `feature/database` | Membre 2 | 🔄 En cours |
 | `feature/analysis` | Membre 3 | ⏳ À venir |
 | `feature/visualisation` | Membre 4 | ⏳ À venir |
