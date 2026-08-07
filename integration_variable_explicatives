@@ -1,0 +1,394 @@
+"""
+Construction d'un DataFrame de variables explicatives depuis PostgreSQL.
+
+Tables utilisées :
+- instrument_marche
+- serie_prix
+- activite_marche
+- indicateur_technique
+
+Jointures :
+- instrument_id
+- date_heure
+- pas_temps
+
+Installation :
+    pip install pandas sqlalchemy psycopg2-binary python-dotenv
+
+Exemple de fichier .env :
+    DB_HOST=51.44.254.88
+    DB_PORT=5432
+    DB_NAME=nom_de_la_base
+    DB_USER=nom_utilisateur
+    DB_PASSWORD=mot_de_passe
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Optional
+
+import pandas as pd
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine, URL
+
+
+def creer_moteur_postgresql() -> Engine:
+    """Crée et teste la connexion PostgreSQL à partir des variables du fichier .env."""
+    load_dotenv()
+
+    parametres = {
+        "host": os.getenv("DB_HOST"),
+        "port": os.getenv("DB_PORT", "5432"),
+        "database": os.getenv("DB_NAME"),
+        "username": os.getenv("DB_USER"),
+        "password": os.getenv("DB_PASSWORD"),
+    }
+
+    manquants = [nom for nom, valeur in parametres.items() if not valeur]
+    if manquants:
+        raise ValueError(
+            "Variables de connexion manquantes dans le fichier .env : "
+            + ", ".join(manquants)
+        )
+
+    url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=parametres["username"],
+        password=parametres["password"],
+        host=parametres["host"],
+        port=int(parametres["port"]),
+        database=parametres["database"],
+    )
+
+    moteur = create_engine(
+        url,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 10},
+    )
+
+    with moteur.connect() as connexion:
+        connexion.execute(text("SELECT 1"))
+
+    return moteur
+
+
+def verifier_unicite(
+    df: pd.DataFrame,
+    nom_table: str,
+    cles: list[str],
+) -> None:
+    """
+    Vérifie qu'une table ne contient pas plusieurs lignes pour une même
+    combinaison instrument/date/pas de temps.
+    """
+    doublons = df.duplicated(subset=cles, keep=False)
+
+    if doublons.any():
+        exemple = (
+            df.loc[doublons, cles]
+            .sort_values(cles)
+            .head(10)
+            .to_string(index=False)
+        )
+        raise ValueError(
+            f"La table '{nom_table}' contient des doublons sur {cles}.\n"
+            f"Exemples :\n{exemple}"
+        )
+
+
+def charger_variables_explicatives(
+    moteur: Engine,
+    symbole: Optional[str] = None,
+    pas_temps: Optional[str] = None,
+    date_debut: Optional[str] = None,
+    date_fin: Optional[str] = None,
+    conserver_lignes_incompletes: bool = True,
+) -> pd.DataFrame:
+    """
+    Charge les quatre tables puis construit un DataFrame unique.
+
+    La table serie_prix sert de table principale.
+    Les tables activite_marche et indicateur_technique sont jointes avec :
+        instrument_id + date_heure + pas_temps
+
+    Paramètres de dates attendus :
+        date_debut="2025-01-01"
+        date_fin="2025-12-31 23:59:59"
+    """
+
+    filtres = []
+    parametres: dict[str, object] = {}
+
+    if symbole:
+        filtres.append("im.symbole = :symbole")
+        parametres["symbole"] = symbole
+
+    if pas_temps:
+        filtres.append("sp.pas_temps = :pas_temps")
+        parametres["pas_temps"] = pas_temps
+
+    if date_debut:
+        filtres.append("sp.date_heure >= :date_debut")
+        parametres["date_debut"] = pd.Timestamp(date_debut)
+
+    if date_fin:
+        filtres.append("sp.date_heure <= :date_fin")
+        parametres["date_fin"] = pd.Timestamp(date_fin)
+
+    clause_where = ""
+    if filtres:
+        clause_where = "WHERE " + " AND ".join(filtres)
+
+    requete_prix_instruments = text(
+        f"""
+        SELECT
+            sp.prix_id,
+            sp.date_heure,
+            sp.pas_temps,
+            sp.prix_ouverture,
+            sp.prix_haut,
+            sp.prix_bas,
+            sp.prix_fermeture,
+            sp.volume AS volume_prix,
+            sp.variation_prix_pct,
+            sp.instrument_id,
+            im.symbole,
+            im.actif,
+            im.devise_cotation,
+            im.plateforme
+        FROM serie_prix AS sp
+        INNER JOIN instrument_marche AS im
+            ON im.instrument_id = sp.instrument_id
+        {clause_where}
+        ORDER BY sp.instrument_id, sp.date_heure, sp.pas_temps
+        """
+    )
+
+    df_prix = pd.read_sql_query(
+        requete_prix_instruments,
+        moteur,
+        params=parametres,
+        parse_dates=["date_heure"],
+    )
+
+    if df_prix.empty:
+        raise ValueError("Aucune donnée trouvée dans serie_prix pour les filtres fournis.")
+
+    instrument_ids = df_prix["instrument_id"].drop_duplicates().astype(int).tolist()
+    date_min = df_prix["date_heure"].min()
+    date_max = df_prix["date_heure"].max()
+
+    requete_activite = text(
+        """
+        SELECT
+            activite_id,
+            date_heure,
+            pas_temps,
+            volume_total,
+            nombre_trades,
+            ratio_achat_vente,
+            liquidite_score,
+            instrument_id
+        FROM activite_marche
+        WHERE instrument_id = ANY(:instrument_ids)
+          AND date_heure BETWEEN :date_min AND :date_max
+        """
+    )
+
+    requete_indicateurs = text(
+        """
+        SELECT
+            indicateur_id,
+            date_heure,
+            pas_temps,
+            sma_20,
+            sma_50,
+            rsi_14,
+            macd,
+            volatilite,
+            instrument_id
+        FROM indicateur_technique
+        WHERE instrument_id = ANY(:instrument_ids)
+          AND date_heure BETWEEN :date_min AND :date_max
+        """
+    )
+
+    bornes = {
+        "instrument_ids": instrument_ids,
+        "date_min": date_min,
+        "date_max": date_max,
+    }
+
+    df_activite = pd.read_sql_query(
+        requete_activite,
+        moteur,
+        params=bornes,
+        parse_dates=["date_heure"],
+    )
+
+    df_indicateurs = pd.read_sql_query(
+        requete_indicateurs,
+        moteur,
+        params=bornes,
+        parse_dates=["date_heure"],
+    )
+
+    cles_jointure = ["instrument_id", "date_heure", "pas_temps"]
+
+    verifier_unicite(df_prix, "serie_prix", cles_jointure)
+
+    if not df_activite.empty:
+        verifier_unicite(df_activite, "activite_marche", cles_jointure)
+
+    if not df_indicateurs.empty:
+        verifier_unicite(df_indicateurs, "indicateur_technique", cles_jointure)
+
+    type_jointure = "left" if conserver_lignes_incompletes else "inner"
+
+    df_modele = df_prix.merge(
+        df_activite,
+        on=cles_jointure,
+        how=type_jointure,
+        validate="one_to_one",
+    )
+
+    df_modele = df_modele.merge(
+        df_indicateurs,
+        on=cles_jointure,
+        how=type_jointure,
+        validate="one_to_one",
+    )
+
+    colonnes_numeriques = [
+        "prix_ouverture",
+        "prix_haut",
+        "prix_bas",
+        "prix_fermeture",
+        "volume_prix",
+        "variation_prix_pct",
+        "volume_total",
+        "nombre_trades",
+        "ratio_achat_vente",
+        "liquidite_score",
+        "sma_20",
+        "sma_50",
+        "rsi_14",
+        "macd",
+        "volatilite",
+    ]
+
+    for colonne in colonnes_numeriques:
+        if colonne in df_modele.columns:
+            df_modele[colonne] = pd.to_numeric(
+                df_modele[colonne],
+                errors="coerce",
+            )
+
+    # Variables calendaires utiles au modèle
+    df_modele["annee"] = df_modele["date_heure"].dt.year
+    df_modele["mois"] = df_modele["date_heure"].dt.month
+    df_modele["jour_semaine"] = df_modele["date_heure"].dt.dayofweek
+    df_modele["heure"] = df_modele["date_heure"].dt.hour
+
+    # Tri temporel indispensable avant une modélisation de séries chronologiques
+    df_modele = (
+        df_modele
+        .sort_values(["instrument_id", "date_heure", "pas_temps"])
+        .reset_index(drop=True)
+    )
+
+    return df_modele
+
+
+def preparer_x_y(
+    df_modele: pd.DataFrame,
+    cible: str = "variation_prix_pct",
+) -> tuple[pd.DataFrame, pd.Series]:
+    """
+    Prépare une matrice X et une cible y.
+
+    Les identifiants techniques et les variables texte descriptives
+    sont exclus de X. Le DataFrame source reste inchangé.
+    """
+    if cible not in df_modele.columns:
+        raise ValueError(f"La cible '{cible}' n'existe pas dans le DataFrame.")
+
+    colonnes_a_exclure = [
+        "prix_id",
+        "activite_id",
+        "indicateur_id",
+        "instrument_id",
+        "date_heure",
+        "symbole",
+        "actif",
+        "devise_cotation",
+        "plateforme",
+        "pas_temps",
+        cible,
+    ]
+
+    X = df_modele.drop(
+        columns=[c for c in colonnes_a_exclure if c in df_modele.columns]
+    ).copy()
+
+    y = df_modele[cible].copy()
+
+    masque_valide = y.notna()
+    return X.loc[masque_valide].reset_index(drop=True), y.loc[masque_valide].reset_index(drop=True)
+
+
+def afficher_controle(df: pd.DataFrame) -> None:
+    """Affiche les principaux contrôles qualité."""
+    print("\nDimensions :", df.shape)
+    print("\nColonnes :")
+    print(df.columns.tolist())
+
+    print("\nTypes :")
+    print(df.dtypes)
+
+    print("\nValeurs manquantes :")
+    print(df.isna().sum().sort_values(ascending=False))
+
+    print("\nAperçu :")
+    print(df.head())
+
+
+def main() -> None:
+    moteur = creer_moteur_postgresql()
+
+    try:
+        df_modele = charger_variables_explicatives(
+            moteur=moteur,
+            symbole=None,             # Exemple : "BTCUSDT"
+            pas_temps=None,           # Exemple : "1h"
+            date_debut=None,          # Exemple : "2025-01-01"
+            date_fin=None,            # Exemple : "2025-12-31 23:59:59"
+            conserver_lignes_incompletes=True,
+        )
+
+        afficher_controle(df_modele)
+
+        # Sauvegarde facultative
+        df_modele.to_csv(
+            "variables_explicatives.csv",
+            index=False,
+            encoding="utf-8-sig",
+        )
+
+        # Exemple de préparation pour un modèle supervisé
+        X, y = preparer_x_y(
+            df_modele,
+            cible="variation_prix_pct",
+        )
+
+        print("\nDimensions de X :", X.shape)
+        print("Dimensions de y :", y.shape)
+
+    finally:
+        moteur.dispose()
+
+
+if __name__ == "__main__":
+    main()
