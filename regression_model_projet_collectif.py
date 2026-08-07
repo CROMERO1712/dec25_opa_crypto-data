@@ -21,6 +21,18 @@ actif / à quel modèle". À signaler à l'équipe pour une évolution du schém
 (ajout de instrument_id et model_name dans prediction_modele).
 En attendant, le script écrit quand même les prédictions, mais ce point est
 une limite connue.
+
+⚠️ CONSIGNE D'ÉQUIPE (Slack, Anthony/Chris — 07/08)
+-----------------------------------------------------
+- Ne plus modifier directement la base SQL ni les scripts d'ingestion Python
+  (effet de bord sur le modèle d'Anthony). Ce script se contente donc de LIRE
+  serie_prix/indicateur_technique et d'écrire uniquement dans prediction_modele
+  (sa propre sortie), jamais dans les tables d'ingestion.
+- instrument_id=1 et instrument_id=4 correspondent tous les deux à BTC-USD,
+  mais depuis deux plateformes/sources différentes. En attendant que Chris
+  restructure le schéma (table plateforme_source séparée) et fusionne les
+  deux id, on ignore explicitement instrument_id=4 et on ne travaille qu'avec
+  instrument_id=1.
 """
 
 import pandas as pd
@@ -43,13 +55,26 @@ PAS_TEMPS = "1h"        # doit correspondre à la valeur utilisée dans serie_pr
 HORIZON = 1              # horizon de prédiction en nombre de pas de temps
 
 
+IGNORED_INSTRUMENT_IDS = (4,)  # doublons de source à ignorer en attendant la fusion par Chris
+
+
 def get_instrument_id(symbole: str) -> int:
-    """Récupère l'instrument_id correspondant au symbole (ex: BTC)."""
-    query = text("SELECT instrument_id FROM instrument_marche WHERE symbole = :symbole")
+    """
+    Récupère l'instrument_id correspondant au symbole (ex: BTC-USD).
+    Exclut volontairement les instrument_id listés dans IGNORED_INSTRUMENT_IDS
+    (doublons dus à des sources/plateformes différentes pour la même crypto,
+    en attendant la restructuration du schéma - voir note en tête de fichier).
+    """
+    query = text(
+        "SELECT instrument_id FROM instrument_marche "
+        "WHERE symbole = :symbole AND instrument_id != ALL(:ignored)"
+    )
     with engine.connect() as conn:
-        result = conn.execute(query, {"symbole": symbole}).fetchone()
+        result = conn.execute(
+            query, {"symbole": symbole, "ignored": list(IGNORED_INSTRUMENT_IDS)}
+        ).fetchone()
     if result is None:
-        raise ValueError(f"Symbole {symbole} introuvable dans instrument_marche")
+        raise ValueError(f"Symbole {symbole} introuvable dans instrument_marche (hors id ignorés)")
     return result[0]
 
 
