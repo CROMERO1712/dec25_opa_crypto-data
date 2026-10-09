@@ -24,11 +24,12 @@ x-airflow-common: &airflow-common
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./collectors:/opt/airflow/collectors:ro
+    - ./ml:/opt/airflow/ml:ro
 
 services:
   airflow-postgres:
     image: postgres:16-alpine
-    restart: "no"
+    restart: unless-stopped
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -65,7 +66,7 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-    restart: "no"
+    restart: unless-stopped
     mem_limit: 1500m
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
@@ -79,7 +80,7 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-    restart: "no"
+    restart: unless-stopped
     mem_limit: 1200m
 
 volumes:

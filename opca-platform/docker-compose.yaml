@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    restart: "no"
+    restart: unless-stopped
     environment:
       DB_HOST: 172.17.0.1
       DB_PORT: 5432
@@ -19,7 +19,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dashboard
-    restart: "no"
+    restart: unless-stopped
     environment:
       API_BASE_URL: http://api:8000
     depends_on:
@@ -32,6 +32,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.collector
+    profiles: ["tools"]
+    restart: "no"
+    environment:
+      DB_HOST: 172.17.0.1
+      DB_PORT: 5432
+      DB_NAME: dst_db
+      DB_USER: daniel
+      DB_PASSWORD: ${DB_PASSWORD:?renseigner DB_PASSWORD dans .env}
+
+  ml:
+    container_name: opca_ml
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
     profiles: ["tools"]
     restart: "no"
     environment:
