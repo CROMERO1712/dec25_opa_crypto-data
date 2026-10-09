@@ -18,6 +18,7 @@ import sys
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
 
 DRY_RUN = "--dry-run" in sys.argv
 PAS_TEMPS = os.getenv("PAS_TEMPS")  # vide = tous les pas de temps presents
@@ -26,14 +27,15 @@ COLS_OUT = ["date_heure", "pas_temps", "sma_20", "sma_50", "rsi_14",
 
 
 def make_engine():
-    uri = "postgresql+psycopg2://{u}:{p}@{h}:{port}/{d}".format(
-        u=os.getenv("DB_USER", "daniel"),
-        p=os.getenv("DB_PASSWORD", ""),
-        h=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        d=os.getenv("DB_NAME", "dst_db"),
+    url = URL.create(
+        "postgresql+psycopg2",
+        username=os.getenv("DB_USER", "daniel"),
+        password=os.getenv("DB_PASSWORD", ""),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=os.getenv("DB_NAME", "dst_db"),
     )
-    return create_engine(uri, pool_pre_ping=True)
+    return create_engine(url, pool_pre_ping=True)
 
 
 def compute_rsi(close, period=14):

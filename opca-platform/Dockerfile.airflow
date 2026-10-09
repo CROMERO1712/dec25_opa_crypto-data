@@ -1,7 +1,17 @@
 FROM apache/airflow:2.9.3-python3.11
 
-# Venv separe pour les collecteurs : evite tout conflit de versions
-# (pandas, requests...) avec les dependances d'Airflow.
+# libgomp1 : requis par XGBoost (venv ML)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
+USER airflow
+
+# Venvs separes : evitent tout conflit de versions (pandas, requests...)
+# avec les dependances d'Airflow.
 COPY requirements-collector.txt /tmp/requirements-collector.txt
 RUN python -m venv /home/airflow/collector-venv \
  && /home/airflow/collector-venv/bin/pip install --no-cache-dir -r /tmp/requirements-collector.txt
+
+COPY requirements-ml.txt /tmp/requirements-ml.txt
+RUN python -m venv /home/airflow/ml-venv \
+ && /home/airflow/ml-venv/bin/pip install --no-cache-dir -r /tmp/requirements-ml.txt
