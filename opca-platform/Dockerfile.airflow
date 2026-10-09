@@ -1,0 +1,7 @@
+FROM apache/airflow:2.9.3-python3.11
+
+# Venv separe pour les collecteurs : evite tout conflit de versions
+# (pandas, requests...) avec les dependances d'Airflow.
+COPY requirements-collector.txt /tmp/requirements-collector.txt
+RUN python -m venv /home/airflow/collector-venv \
+ && /home/airflow/collector-venv/bin/pip install --no-cache-dir -r /tmp/requirements-collector.txt
