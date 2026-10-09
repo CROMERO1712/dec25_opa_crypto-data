@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-collector.txt .
+RUN pip install --no-cache-dir -r requirements-collector.txt
+
+COPY collectors/ ./collectors/
+
+WORKDIR /app/collectors
+
+CMD ["python", "insert_binance.py"]

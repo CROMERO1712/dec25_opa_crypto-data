@@ -1,0 +1,42 @@
+services:
+  api:
+    container_name: opca_api_test
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: "no"
+    environment:
+      DB_HOST: 172.17.0.1
+      DB_PORT: 5432
+      DB_NAME: dst_db
+      DB_USER: daniel
+      DB_PASSWORD: ${DB_PASSWORD:?renseigner DB_PASSWORD dans .env}
+    ports:
+      - "8001:8000"
+
+  dashboard:
+    container_name: opca_dashboard_test
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    restart: "no"
+    environment:
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "8502:8501"
+
+  collector:
+    container_name: opca_collector_test
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
+    profiles: ["tools"]
+    restart: "no"
+    environment:
+      DB_HOST: 172.17.0.1
+      DB_PORT: 5432
+      DB_NAME: dst_db
+      DB_USER: daniel
+      DB_PASSWORD: ${DB_PASSWORD:?renseigner DB_PASSWORD dans .env}
