@@ -31,11 +31,25 @@ with DAG(
 ) as dag:
     collecte_binance = BashOperator(
         task_id="collecte_binance",
-        bash_command=f"{COLLECT_PY} {COLLECTORS}/insert_binance.py",
+        bash_command=(
+            "ssh -i /home/airflow/.ssh/airflow_collector "
+            "-o BatchMode=yes -o StrictHostKeyChecking=yes "
+            "ubuntu@172.17.0.1 "
+            "'cd /home/ubuntu/projet/plateforme/opca-platform && "
+            "docker compose --profile tools run --rm --no-deps "
+            "collector python insert_binance.py'"
+        ),
     )
     collecte_coinbase = BashOperator(
         task_id="collecte_coinbase",
-        bash_command=f"{COLLECT_PY} {COLLECTORS}/import_bougie_coinbase.py",
+        bash_command=(
+            "ssh -i /home/airflow/.ssh/airflow_collector "
+            "-o BatchMode=yes -o StrictHostKeyChecking=yes "
+            "ubuntu@172.17.0.1 "
+            "'cd /home/ubuntu/projet/plateforme/opca-platform && "
+            "docker compose --profile tools run --rm --no-deps "
+            "collector python import_bougie_coinbase.py'"
+        ),
     )
     calcul_indicateurs = BashOperator(
         task_id="calcul_indicateurs",

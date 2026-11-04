@@ -8,3 +8,6 @@ venv/
 backups/
 airflow/logs/
 models/*.joblib
+
+# Clés SSH privées Airflow
+airflow/ssh/
