@@ -1,0 +1,21 @@
+# Prometheus de la VM OPCA : relève les mesures toutes les 30 s, conservées 15 jours.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: vm
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance: vm-opca
+
+  - job_name: conteneurs
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          instance: vm-opca
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

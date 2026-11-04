@@ -1,0 +1,65 @@
+name: opca_v2_monitoring
+
+# Supervision de l'infrastructure de la VM (ressources de l'hôte et des conteneurs).
+# Les trois services se parlent sur le réseau privé de ce projet compose, par leur nom.
+# Seul Prometheus est publié, et uniquement sur 172.17.0.1 (passerelle Docker, pas internet),
+# comme la base opca_db (172.17.0.1:5433) : Grafana l'interroge sur 172.17.0.1:9090.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: opca_prometheus
+    restart: unless-stopped
+    mem_limit: 300m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=2GB
+    ports:
+      - "172.17.0.1:9090:9090"
+    volumes:
+      - /home/ubuntu/projet/v2/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on: [node-exporter, cadvisor]
+
+  # Mesures de la VM : CPU, mémoire, disque, charge (lues dans /proc et /sys de l'hôte).
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: opca_node_exporter
+    restart: unless-stopped
+    mem_limit: 64m
+    pid: host
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|snap/.+)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+
+  # Mesures par conteneur : CPU, mémoire (et limite), réseau.
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.5
+    container_name: opca_cadvisor
+    restart: unless-stopped
+    mem_limit: 200m
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --housekeeping_interval=30s
+      - --docker_only=true
+      - --store_container_labels=false
+      - --disable_metrics=disk,diskIO,tcp,udp,percpu,sched,process,hugetlb,referenced_memory,cpu_topology,resctrl
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+volumes:
+  prometheus_data:
