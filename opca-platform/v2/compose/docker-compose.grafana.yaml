@@ -1,0 +1,26 @@
+name: opca_v2_grafana
+services:
+  grafana:
+    image: grafana/grafana-oss:11.2.0
+    container_name: opca_grafana_v2
+    restart: unless-stopped
+    mem_limit: 400m
+    env_file: /home/ubuntu/projet/v2/grafana_v2.env
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/opca.json
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - /home/ubuntu/projet/v2/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /home/ubuntu/projet/v2/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+volumes:
+  grafana_data:

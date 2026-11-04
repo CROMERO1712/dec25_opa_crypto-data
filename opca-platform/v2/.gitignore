@@ -1,0 +1,14 @@
+# secrets : seuls les *.env.example sont versionnes
+*.env
+!*.env.example
+# donnees, sauvegardes, sorties et journaux produits sur la VM
+backups/
+rf_v2/sorties*/
+rf_v2/journal/
+rf_v2/.pkgs/
+rf_v2/.verrou
+rf_v2/log_delta.txt
+checks/*.log
+checks/last_status.txt
+*.avant_*
+**/sauvegarde_avant_*/

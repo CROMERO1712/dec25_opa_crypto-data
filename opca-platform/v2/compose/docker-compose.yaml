@@ -1,0 +1,21 @@
+name: opca_v2
+services:
+  api:
+    image: projet_test-api
+    container_name: opca_api_v2
+    restart: unless-stopped
+    mem_limit: 256m
+    env_file: /home/ubuntu/projet/v2/api_v2.env
+    ports:
+      - "8003:8000"
+  dashboard:
+    image: projet_test-dashboard
+    container_name: opca_dashboard_v2
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "8503:8501"
