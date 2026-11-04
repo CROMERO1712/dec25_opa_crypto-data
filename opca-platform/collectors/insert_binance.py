@@ -47,18 +47,22 @@ def insert_into_postgres(klines: list, symbol: str, instrument_id: int, interval
         print(f"[{datetime.now()}] Connexion à PostgreSQL réussie.", flush=True)
 
         for kline in klines:
+            ouverture, fermeture = float(kline[1]), float(kline[4])
+            # meme calcul que import_bougie_coinbase.py
+            variation = (fermeture - ouverture) / ouverture * 100 if ouverture else None
             insert_query = """
             INSERT INTO serie_prix (
                 date_heure, pas_temps, prix_ouverture, prix_haut,
-                prix_bas, prix_fermeture, volume, instrument_id, plateforme_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                prix_bas, prix_fermeture, volume, variation_prix_pct, instrument_id, plateforme_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (instrument_id,plateforme_id, date_heure, pas_temps)
             DO UPDATE SET
                 prix_ouverture = EXCLUDED.prix_ouverture,
                 prix_haut = EXCLUDED.prix_haut,
                 prix_bas = EXCLUDED.prix_bas,
                 prix_fermeture = EXCLUDED.prix_fermeture,
-                volume = EXCLUDED.volume;
+                volume = EXCLUDED.volume,
+                variation_prix_pct = EXCLUDED.variation_prix_pct;
             """
             cursor.execute(insert_query, (
                 datetime.fromtimestamp(kline[0] / 1000),  # date_heure
@@ -68,6 +72,7 @@ def insert_into_postgres(klines: list, symbol: str, instrument_id: int, interval
                 float(kline[3]),                        # prix_bas
                 float(kline[4]),                        # prix_fermeture
                 float(kline[5]),                        # volume
+                variation,                              # variation_prix_pct
                 instrument_id,                          # instrument_id
                 plateforme_id                           # plateforme_id
             ))

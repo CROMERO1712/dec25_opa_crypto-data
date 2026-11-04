@@ -1,0 +1,144 @@
+# Alertes Grafana sur les ressources de la VM OPCA (onglet Alerting de Grafana).
+# Sans point de contact configuré, elles s'affichent dans Grafana ; on pourra ensuite ajouter
+# un envoi Slack ou e-mail (Alerting > Contact points).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: infrastructure
+    folder: OPCA
+    interval: 1m
+    rules:
+      - uid: infra-cpu
+        title: CPU de la VM au-dessus de 85 %
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "CPU de la VM à {{ with $values.A }}{{ humanize .Value }}{{ end }} % depuis 10 minutes"
+          description: "Regarder le tableau Infrastructure VM OPCA : quel conteneur consomme ? (souvent un entraînement de modèle ou Airflow)"
+        labels: {severite: avertissement}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: opca-prom
+            model:
+              refId: A
+              instant: true
+              expr: '100 * (1 - sum(rate(node_cpu_seconds_total{mode="idle"}[5m])) / sum(rate(node_cpu_seconds_total[5m])))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [85]}
+
+      - uid: infra-memoire
+        title: Mémoire de la VM au-dessus de 90 %
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "Mémoire utilisée à {{ with $values.A }}{{ humanize .Value }}{{ end }} % (la VM n'a pas de swap)"
+          description: "Sans swap, le système tue un processus quand la mémoire est pleine. Repérer le conteneur en cause dans le tableau des conteneurs."
+        labels: {severite: critique}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: opca-prom
+            model:
+              refId: A
+              instant: true
+              expr: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [90]}
+
+      - uid: infra-disque
+        title: Disque de la VM au-dessus de 85 %
+        condition: C
+        for: 15m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "Disque / rempli à {{ with $values.A }}{{ humanize .Value }}{{ end }} %"
+          description: "Vérifier ~/projet/backups (sauvegardes) et les images Docker inutilisées (docker image prune)."
+        labels: {severite: critique}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: opca-prom
+            model:
+              refId: A
+              instant: true
+              expr: '100 * (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [85]}
+
+      - uid: infra-conteneur-limite
+        title: Conteneur proche de sa limite mémoire (> 90 %)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "Un conteneur utilise plus de 90 % de sa limite mémoire"
+          description: "Risque d'arrêt brutal (OOM). Voir la colonne « % de la limite » du tableau des conteneurs."
+        labels: {severite: avertissement}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: opca-prom
+            model:
+              refId: A
+              instant: true
+              expr: 'max(100 * sum by (name) (container_memory_working_set_bytes{name=~".+"}) / (sum by (name) (container_spec_memory_limit_bytes{name=~".+"}) > 0))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [90]}
+
+      - uid: infra-supervision
+        title: Supervision muette (mesures absentes)
+        condition: C
+        for: 5m
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: "Prometheus ne reçoit plus les mesures de la VM ou des conteneurs"
+          description: "Vérifier les conteneurs opca_prometheus, opca_node_exporter et opca_cadvisor (docker ps)."
+        labels: {severite: avertissement}
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: opca-prom
+            model:
+              refId: A
+              instant: true
+              expr: 'min(up{job=~"vm|conteneurs"})'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: lt, params: [1]}

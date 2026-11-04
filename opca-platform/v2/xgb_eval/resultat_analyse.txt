@@ -1,0 +1,55 @@
+Lignes avec cible : 12041 (2026-09-03 12:50:00 -> 2026-10-15 08:10:00)
+[
+  {
+    "scenario": "A - test chronologique 80/20 (script d'origine)",
+    "n_test": 2409,
+    "debut_test": "2026-10-06 23:30:00",
+    "fin_test": "2026-10-15 08:10:00",
+    "MAE_modele": 336.0473043794109,
+    "RMSE_modele": 474.05396155402207,
+    "MAE_naive": 193.35343295973408,
+    "RMSE_naive": 292.1088328603487,
+    "precision_direction": 0.522623495226235,
+    "direction_toujours_majoritaire": 0.5168119551681196,
+    "correlation_variation_predite_reelle": 0.04516463452606815,
+    "jours_ou_le_modele_bat_la_naive": "2/10"
+  },
+  {
+    "scenario": "B - test 80/20 avec écart de 12 lignes",
+    "n_test": 2409,
+    "debut_test": "2026-10-06 23:30:00",
+    "fin_test": "2026-10-15 08:10:00",
+    "MAE_modele": 336.40767642175206,
+    "RMSE_modele": 470.974570944372,
+    "MAE_naive": 193.35343295973408,
+    "RMSE_naive": 292.1088328603487,
+    "precision_direction": 0.5143212951432129,
+    "direction_toujours_majoritaire": 0.5168119551681196,
+    "correlation_variation_predite_reelle": 0.04499281800196877,
+    "jours_ou_le_modele_bat_la_naive": "1/10"
+  },
+  {
+    "scenario": "C - fenêtre de prediction_modele (EN ÉCHANTILLON, flatteur)",
+    "n_test": 276,
+    "debut_test": "2026-10-14 09:15:00",
+    "fin_test": "2026-10-15 08:10:00",
+    "MAE_modele": 158.89906250000004,
+    "RMSE_modele": 227.0055524424928,
+    "MAE_naive": 272.0698913043478,
+    "RMSE_naive": 382.24465080426995,
+    "precision_direction": 0.8007246376811594,
+    "direction_toujours_majoritaire": 0.5434782608695652,
+    "correlation_variation_predite_reelle": 0.8621122203576944,
+    "jours_ou_le_modele_bat_la_naive": "2/2"
+  }
+]
+
+===== SYNTHÈSE =====
+A - test chronologique 80/20 (script d'origine)
+   MAE modèle 336 $ | MAE naïve 193 $ | gain -73.8 % | direction 52.3 % (référence 51.7 %) | jours gagnés 2/10
+B - test 80/20 avec écart de 12 lignes
+   MAE modèle 336 $ | MAE naïve 193 $ | gain -74.0 % | direction 51.4 % (référence 51.7 %) | jours gagnés 1/10
+C - fenêtre de prediction_modele (EN ÉCHANTILLON, flatteur)
+   MAE modèle 159 $ | MAE naïve 272 $ | gain +41.6 % | direction 80.1 % (référence 54.3 %) | jours gagnés 2/2
+
+Verdict (scénario B, le plus honnête) : le modèle NE bat PAS la référence naïve en MAE.

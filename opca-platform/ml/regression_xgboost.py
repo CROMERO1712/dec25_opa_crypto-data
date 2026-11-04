@@ -24,10 +24,10 @@ import sys
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, roc_auc_score
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
-from xgboost import XGBRegressor
+from xgboost import XGBClassifier, XGBRegressor
 
 DRY_RUN = "--dry-run" in sys.argv
 SYMBOLE = os.getenv("SYMBOLE", "BTC-USD")
@@ -72,6 +72,12 @@ def new_model():
                         subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=2)
 
 
+def new_classifier():
+    """Direction (1 = hausse) : sa probabilite donne score_confiance."""
+    return XGBClassifier(n_estimators=300, max_depth=3, learning_rate=0.05, subsample=0.8,
+                         colsample_bytree=0.8, random_state=42, n_jobs=2, eval_metric="logloss")
+
+
 def fit_predict(df):
     """df : jeu de donnees joint. Retourne (predictions, metriques, modele)."""
     df = df.sort_values("date_heure").reset_index(drop=True)
@@ -88,24 +94,40 @@ def fit_predict(df):
     metrics = {"rmse": float(np.sqrt(mean_squared_error(test["target"], pred_test))),
                "mae": float(mean_absolute_error(test["target"], pred_test)),
                "n_train": len(train), "n_test": len(test)}
+    up = (labelled["target"] > labelled["prix_fermeture"]).astype(int)
+    clf = new_classifier().fit(train[FEATURES], up.iloc[:split])
+    y_te = up.iloc[split:]
+    metrics["auc_direction"] = (float(roc_auc_score(y_te, clf.predict_proba(test[FEATURES])[:, 1]))
+                                if y_te.nunique() > 1 else float("nan"))
     model = new_model().fit(labelled[FEATURES], labelled["target"])  # modele final
+    clf = new_classifier().fit(labelled[FEATURES], up)
     window = ok.tail(PRED_WINDOW)
     preds = model.predict(window[FEATURES])
+    proba_up = clf.predict_proba(window[FEATURES])[:, 1]
     out = pd.DataFrame({
         "date_heure": window["date_heure"].values,
         "horizon_prediction": LABEL,
         "prix_predit": preds.astype(float),
         "direction_predite": np.where(preds > window["prix_fermeture"].values, "hausse", "baisse"),
-        "score_confiance": None,
+        # probabilite (classifieur) que la direction prevue par la regression soit la bonne
+        "score_confiance": np.round(np.where(preds > window["prix_fermeture"].values,
+                                              proba_up, 1 - proba_up), 4),
     })
     return out, metrics, model
 
 
 def write_predictions(conn, out):
-    conn.execute(text("DELETE FROM prediction_modele WHERE horizon_prediction = :h AND date_heure >= :d"),
-                 {"h": LABEL, "d": pd.Timestamp(out["date_heure"].min()).to_pydatetime()})
-    out.to_sql("prediction_modele", conn, if_exists="append", index=False,
-               method="multi", chunksize=500)
+    """Mise a jour en place, insertion sinon : prediction_id reste stable d'une heure a l'autre
+    (signal_trading.prediction_id y fait reference)."""
+    for r in out.to_dict("records"):
+        params = {"h": LABEL, "d": pd.Timestamp(r["date_heure"]).to_pydatetime(),
+                  "p": float(r["prix_predit"]), "dir": r["direction_predite"],
+                  "s": None if pd.isna(r["score_confiance"]) else float(r["score_confiance"])}
+        res = conn.execute(text("UPDATE prediction_modele SET prix_predit = :p, direction_predite = :dir, "
+                                "score_confiance = :s WHERE horizon_prediction = :h AND date_heure = :d"), params)
+        if res.rowcount == 0:
+            conn.execute(text("INSERT INTO prediction_modele (date_heure, horizon_prediction, prix_predit, "
+                              "direction_predite, score_confiance) VALUES (:d, :h, :p, :dir, :s)"), params)
 
 
 def main():
@@ -118,6 +140,7 @@ def main():
         print(f"[{LABEL}] {len(df)} lignes jointes (prix + indicateurs).")
         out, m, model = fit_predict(df)
         print(f"[{LABEL}] RMSE={m['rmse']:.4f} MAE={m['mae']:.4f} (train={m['n_train']}, test={m['n_test']})")
+        print(f"[{LABEL}] AUC direction (classifieur, test) = {m['auc_direction']:.3f}")
         print(f"[{LABEL}] {len(out)} predictions, de {out['date_heure'].min()} a {out['date_heure'].max()}.")
         if MODEL_DIR:
             os.makedirs(MODEL_DIR, exist_ok=True)
