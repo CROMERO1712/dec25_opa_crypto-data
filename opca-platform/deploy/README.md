@@ -43,7 +43,7 @@ On peut les relancer seules, par exemple avec `--etapes airflow,cron`.
 | `base` | Lance `opca_pg_v2` et crée les rôles `grafana_ro` et `opca_admin`. Ensuite, soit il crée le schéma et les données de référence, soit il restaure la sauvegarde donnée. |
 | `adminer` | Lance Adminer, accessible uniquement sur 127.0.0.1:8085 (par tunnel SSH). |
 | `api` | Lance l'API (:8003) et Streamlit (:8503). |
-| `airflow` | Lance Airflow (:8081), crée la clé SSH du scheduler vers l'hôte et les variables `opca_v2_*`. Il met le DAG v1 en pause et active les DAG v2 et Random Forest. |
+| `airflow` | Lance Airflow (:8081), crée la clé SSH du scheduler vers l'hôte et les variables `opca_v2_*`. Il active le DAG horaire v2 et le DAG Random Forest (l'ancien DAG v1 a été retiré le 04/11/2026). |
 | `supervision` | Lance Prometheus, node-exporter, cAdvisor et Grafana (:3001). |
 | `cron` | Ajoute les 4 lignes cron et crée les dossiers des sauvegardes et des rapports. |
 | `controle` | Lance `check_opca.sh` et affiche les adresses. |
