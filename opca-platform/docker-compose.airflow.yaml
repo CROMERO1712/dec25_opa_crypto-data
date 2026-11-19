@@ -1,3 +1,4 @@
+name: opca_airflow
 # Airflow (orchestration de la collecte) - OPCA Crypto Data
 # Lancement : docker compose -p opca_airflow -f docker-compose.airflow.yaml up -d
 # Interface : http://<ip-vm>:8081  (identifiants definis dans .env)
@@ -76,6 +77,12 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./collectors:/opt/airflow/collectors:ro
+      - ./ml:/opt/airflow/ml:ro
+      - ./airflow/ssh:/home/airflow/.ssh:ro
     command: scheduler
     depends_on:
       airflow-init:
