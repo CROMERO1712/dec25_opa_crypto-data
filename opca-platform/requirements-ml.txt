@@ -1,0 +1,7 @@
+pandas==2.3.3
+numpy==2.2.6
+SQLAlchemy==2.0.51
+psycopg2-binary==2.9.12
+scikit-learn==1.7.2
+joblib==1.5.3
+xgboost-cpu==2.1.4
