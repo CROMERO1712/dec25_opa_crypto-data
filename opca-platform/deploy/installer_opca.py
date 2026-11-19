@@ -51,7 +51,7 @@ PG = "opca_pg_v2"
 SCHED = "opca_airflow-airflow-scheduler-1"
 AIRFLOW_UID = "50000"
 DAG_ACTIFS = ["opca_pipeline_horaire_v2", "opca_random_forest_24h"]
-DAG_EN_PAUSE = ["opca_pipeline_horaire"]    # ancien pipeline v1, conservé mais arrêté
+DAG_EN_PAUSE = []                           # l'ancien pipeline v1 a été retiré le 04/11/2026
 IMAGES = [("Dockerfile.api", "projet_test-api"),
           ("Dockerfile.dashboard", "projet_test-dashboard"),
           ("Dockerfile.ml", "opca-platform-ml")]   # image du Random Forest (lancer_rf.sh)
@@ -59,7 +59,7 @@ PORTS = {8003: "API", 8503: "Streamlit", 3001: "Grafana", 8081: "Airflow", 8085:
 # chemins de la VM d'origine écrits en dur dans ces fichiers, adaptés si l'utilisateur n'est pas ubuntu
 FICHIERS_CHEMINS = ["v2/compose/docker-compose.yaml", "v2/compose/docker-compose.grafana.yaml",
                     "v2/monitoring/docker-compose.monitoring.yaml", "v2/rf_v2/lancer_rf.sh",
-                    "airflow/dags/opca_random_forest_24h.py", "airflow/dags/opca_pipeline_horaire.py"]
+                    "airflow/dags/opca_random_forest_24h.py"]
 CRON = [
     "25 * * * * $HOME/projet/v2/checks/check_opca.sh >> $HOME/projet/v2/checks/check.log 2>&1",
     "17 3 * * * $HOME/projet/v2/checks/backup_v2.sh >> $HOME/projet/v2/checks/backup.log 2>&1",
@@ -317,7 +317,7 @@ def etape_secrets(args):
                                 f"GRAFANA_DB_USER=grafana_ro\nGRAFANA_DB_PASSWORD={pw_ro}\n"),
         V2 / "grafana_ro.env": f"GRAFANA_RO_PASSWORD={pw_ro}\n",
         V2 / "opca_admin.env": f"# compte PostgreSQL des humains (Adminer)\nOPCA_ADMIN_PASSWORD={pw_admin}\n",
-        # DB_* : ancien pipeline v1 (en pause) ; le DAG v2 lit les variables Airflow opca_v2_db_*
+        # DB_* : variables historiques (le pipeline v1 qui les lisait est retiré) ; le DAG v2 lit les variables Airflow opca_v2_db_*
         OPCA / ".env": (f"DB_HOST={GW}\nDB_PORT=5433\nDB_NAME=opca_db\nDB_USER=opca_app\nDB_PASSWORD={pw_pg}\n"
                         f"AIRFLOW_UID={AIRFLOW_UID}\nAIRFLOW_ADMIN_PASSWORD={pw_af}\nAIRFLOW_SECRET_KEY={cle_af}\n"),
     }
