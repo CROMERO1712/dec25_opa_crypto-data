@@ -64,7 +64,9 @@ Simulation sans rien modifier : `python3 deploy/installer_opca.py --simulation` 
 - `api/` API FastAPI - `Streamlit/` dashboard - `collectors/` collecteurs (Binance, Coinbase, activite, sentiment, RSS)
 - `airflow/dags/` DAG horaire v2 et DAG Random Forest - `ml/` indicateurs, XGBoost, archivage OOS, signaux
 - `deploy/` installation complete (schema, donnees de reference, installateur)
-- `v2/compose`, `v2/monitoring`, `v2/grafana` : compose de production, Prometheus, tableaux et alertes Grafana
+- `v2/compose` : compose de production (base et Adminer, API et Streamlit, Grafana)
+- `v2/monitoring`, `v2/grafana` : Prometheus, tableaux et alertes Grafana
+- configuration detaillee de la VM : `../docs/vm/CONFIGURATION_VM.md`
 - `v2/rf_v2` Random Forest 24 h - `v2/xgb_eval` evaluation XGBoost - `v2/checks` controles, sauvegarde, cron
 - `v2/rapport_quotidien` rapport du matin et du soir - `v2/tools` outils d'exploitation
 - `v2/migration` scripts de migration de la VM (octobre-novembre 2026), pour l'historique

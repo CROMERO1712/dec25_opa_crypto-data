@@ -67,6 +67,14 @@ APIs Externes
 
 ---
 
+## 🖥️ Plateforme en production (VM du groupe)
+
+- Code et configuration de la plateforme : [`opca-platform/`](opca-platform/README.md)
+- Informations et configuration de la VM : [`docs/vm/`](docs/vm/README.md)
+- Installation complète sur une VM neuve : [`opca-platform/deploy/`](opca-platform/deploy/README.md)
+
+---
+
 ## 📁 Structure du projet
 
 ```

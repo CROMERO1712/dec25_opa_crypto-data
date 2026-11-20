@@ -1,0 +1,32 @@
+# Base de donnees opca_db et Adminer.
+# Sur la VM, ces deux conteneurs ont ete crees avec `docker run` (pas de compose) ;
+# ce fichier reproduit exactement leur configuration en service (releve du 20/11/2026).
+#
+#   docker compose -p opca_base -f docker-compose.base.yaml up -d
+#
+# pg.env (droits 600, jamais versionne) : voir ../pg.env.example
+services:
+  opca_pg_v2:
+    image: postgres:16-alpine
+    container_name: opca_pg_v2
+    restart: unless-stopped
+    env_file: ../pg.env                 # POSTGRES_USER=opca_app, POSTGRES_DB=opca_db, POSTGRES_PASSWORD
+    ports:
+      - "172.17.0.1:5433:5432"          # passerelle Docker uniquement : la base n'est pas exposee sur internet
+    volumes:
+      - opca_pg_v2_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    # log_connections et log_disconnections sont actives par ALTER SYSTEM
+    # (postgresql.auto.conf, dans le volume) : pas d'option de commande.
+
+  opca_adminer_v2:
+    image: adminer:4.8.1
+    container_name: opca_adminer_v2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8080"           # accessible seulement par tunnel SSH
+    mem_limit: 128m
+
+volumes:
+  opca_pg_v2_data:
+    external: true                      # volume existant qui contient les donnees
