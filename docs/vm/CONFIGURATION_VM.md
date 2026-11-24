@@ -1,6 +1,7 @@
 # Configuration de la VM du projet OPCA
 
-Releve effectue sur la VM de production le 20/11/2026. Aucun mot de passe n'apparait ici :
+Releve effectue sur la VM de production le 20/11/2026, verifie le 24/11/2026 (code et configuration
+identiques au depot, controle `check_opca.sh` : 31 OK, 0 WARN, 0 FAIL ; disque utilise a 67 %). Aucun mot de passe n'apparait ici :
 les secrets sont dans des fichiers `.env` (droits 600) sur la VM, jamais dans le depot.
 
 ## 1. Machine

@@ -2,7 +2,7 @@
 
 Ce document explique chaque élément de la plateforme OPCA : à quoi il sert, comment il fonctionne, où il se trouve et comment vérifier qu'il marche. Il suppose de connaître les bases (ligne de commande, SQL, Python) mais pas le projet.
 
-État décrit : 04/11/2026 (inchangé au 20/11/2026 ; configuration détaillée dans CONFIGURATION_VM.md).
+État décrit : 04/11/2026 (architecture et code inchangés au 24/11/2026 ; résultats des modèles mis à jour au 24/11/2026 ; configuration détaillée dans CONFIGURATION_VM.md).
 
 ---
 
@@ -368,14 +368,27 @@ Le script `~/projet/v2/xgb_eval/log_previsions_oos.py` (tâche `log_previsions_o
 | MAE naïve | Même chose pour la prévision naïve |
 | Bonne direction | % de fois où le modèle a prévu le bon sens (hausse ou baisse) ; 50 % = hasard |
 
-### Résultats au 02/11/2026
+### Résultats au 24/11/2026
 
 | Modèle | Prévisions évaluées | MAE modèle | MAE naïve | Bonne direction |
 | --- | --- | --- | --- | --- |
-| XGBoost 1 h | 5 028 | 200 $ | 185 $ | 50,4 % |
-| Random Forest 24 h | 12 | 1 782 $ | 1 146 $ | 25,0 % |
+| XGBoost 1 h | 11 400 | 278 $ | 230 $ | 52,7 % |
+| Random Forest 24 h | 34 | 1 796 $ | 1 354 $ | 29,4 % |
 
-**Conclusion :** aucun modèle ne bat la prévision naïve. Le Random Forest a trop peu de prévisions pour conclure.
+Pour comparaison, au 02/11/2026 : XGBoost 5 028 prévisions, 200 $ contre 185 $, 50,4 % ; Random Forest 12 prévisions, 1 782 $ contre 1 146 $, 25,0 %.
+
+**Évolution par semaine** (écart = MAE du modèle comparée à la MAE naïve ; positif = moins bon que la naïve) :
+
+| Semaine du | XGBoost : prévisions | XGBoost : écart | XGBoost : direction | Random Forest : prévisions | Random Forest : écart |
+| --- | --- | --- | --- | --- | --- |
+| 02/11 | 2 016 | +0,5 % | 56,7 % | 7 | −2,9 % |
+| 09/11 | 2 016 | +42,2 % | 52,2 % | 7 | +49,8 % |
+| 16/11 | 2 016 | +36,1 % | 55,4 % | 7 | +28,4 % |
+| 23/11 (en cours) | 387 | +16,9 % | 53,2 % | 2 | −36,5 % |
+
+Dernier entraînement du Random Forest (nuit du 23 au 24/11, période de test) : MAE 1 882 $ contre 1 415 $ pour la naïve, R² 0,82 contre 0,89.
+
+**Conclusion :** aucun modèle ne bat la prévision naïve. XGBoost devine un peu mieux la direction que le hasard (52 à 57 % selon les semaines), mais son erreur en dollars s'est dégradée depuis le 09/11, période de forte volatilité. Le Random Forest a encore trop peu de prévisions (une par jour) pour conclure.
 
 ```sql
 -- Résumé de l'évaluation
@@ -425,7 +438,7 @@ Pour un ACHAT ou une VENTE, le signal fixe aussi :
 
 Exemple : volatilité 0,0012 et prix 77 000 $ → écart ≈ 320 $, stop-loss à 76 360 $ et take-profit à 77 960 $ pour un ACHAT.
 
-Chaque signal est relié à sa prévision (`prediction_id`), au sentiment du jour (`sentiment_id`) et à la dernière actualité de l'heure (`evenement_id`). Comme le modèle ne bat pas la référence, **presque tous les signaux sont des ATTENTE**, et c'est le comportement voulu.
+Chaque signal est relié à sa prévision (`prediction_id`), au sentiment du jour (`sentiment_id`) et à la dernière actualité de l'heure (`evenement_id`). Au 24/11/2026, 516 signaux ont été produits : 236 ATTENTE (46 %), 141 ACHAT et 139 VENTE. Le score de confiance dépasse donc souvent le seuil de 0,55. Comme le modèle ne bat pas la référence, ces signaux restent à évaluer frais compris avant toute conclusion.
 
 Réglages (variables d'environnement de la tâche) : `SEUIL=0.55`, `K_SL=2`, `K_TP=3`.
 
